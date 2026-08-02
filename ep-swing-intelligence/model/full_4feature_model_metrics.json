@@ -1,0 +1,42 @@
+[
+  {
+    "features": [
+      "avg_bat_speed",
+      "squared_up_per_swing",
+      "swing_length",
+      "attack_angle"
+    ],
+    "target": "est_woba",
+    "n": 205,
+    "cv_folds": 10,
+    "cv_r2": 0.4185,
+    "cv_mae": 0.02079,
+    "coefficients": {
+      "avg_bat_speed": 0.01121,
+      "squared_up_per_swing": 0.44123,
+      "swing_length": -0.0138,
+      "attack_angle": 0.00115
+    },
+    "intercept": -0.50477
+  },
+  {
+    "features": [
+      "avg_bat_speed",
+      "squared_up_per_swing",
+      "swing_length",
+      "attack_angle"
+    ],
+    "target": "brl_percent",
+    "n": 205,
+    "cv_folds": 10,
+    "cv_r2": 0.6324,
+    "cv_mae": 2.09821,
+    "coefficients": {
+      "avg_bat_speed": 1.21292,
+      "squared_up_per_swing": 10.13597,
+      "swing_length": -0.72107,
+      "attack_angle": 0.41897
+    },
+    "intercept": -80.30309
+  }
+]

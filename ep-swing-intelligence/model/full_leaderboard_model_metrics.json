@@ -1,0 +1,18 @@
+{
+  "features": [
+    "avg_bat_speed",
+    "squared_up_per_swing",
+    "swing_length"
+  ],
+  "target": "run_value_per_swing",
+  "n": 205,
+  "cv_folds": 10,
+  "cv_r2": 0.1339,
+  "cv_mae": 0.0119,
+  "coefficients": {
+    "avg_bat_speed": 0.00315,
+    "squared_up_per_swing": 0.11171,
+    "swing_length": -0.00181
+  },
+  "intercept": -0.26045
+}
