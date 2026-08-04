@@ -81,11 +81,32 @@ es un resultado creíble y defendible frente a alguien técnico — el
 resultado simulado (0.81) sigue siendo una referencia, no una comparación
 justa.
 
-**Hallazgo dentro del capítulo 5:** `squared_up_per_swing` pesa más que
-`avg_bat_speed` en ambos targets (coeficientes estandarizados) — la calidad
-de contacto explica más varianza que la fuerza bruta del swing, contrario a
-la intuición de "pegarle más fuerte = mejor resultado". Ver
-`report/chart_capitulo5_coeficientes.png`.
+**Corrección (post-capítulo 5):** la primera versión de este hallazgo decía
+que `squared_up_per_swing` pesaba más que `avg_bat_speed` en ambos targets.
+Era un bug de escala, no un hallazgo real: `train_and_eval()` ajustaba
+`LinearRegression` sobre las features en sus unidades originales (mph para
+bat_speed, una proporción 0-1 para squared_up_per_swing) sin estandarizar
+primero, así que los coeficientes crudos no eran comparables entre sí — el
+de squared_up_per_swing salía numéricamente más grande solo porque su
+escala es ~65x más chica que la de bat_speed, no porque pesara más.
+
+Con las features estandarizadas (z-score) antes de ajustar el modelo — que
+es lo que "coeficientes estandarizados" debe significar — el resultado se
+invierte: **`avg_bat_speed` tiene el coeficiente más alto en ambos
+targets** (xwOBA: 0.032 vs. 0.021; Barrel%: 3.45 vs. 0.49). El R² del
+modelo no cambió (0.42 / 0.63 — la predicción siempre fue correcta, solo la
+interpretación del coeficiente estaba mal), y el CV sigue siendo 10-fold
+con `random_state=42`.
+
+Lo que sí sigue siendo real y se replica en una muestra externa de 177
+bateadores de MLB: `avg_bat_speed` y `squared_up_per_swing` están
+correlacionados negativamente entre sí (r≈-0.65, el trade-off poder/contacto),
+lo que produce un efecto de supresión — la correlación cruda de
+squared_up_per_swing con xwOBA es casi cero (r=0.07, n.s.), pero su
+coeficiente estandarizado, una vez controlado por bat_speed, es sustancial
+(0.021 de 0.032+0.021 = ~40% del efecto combinado de las dos). Es decir:
+squared_up_per_swing sí importa — pero menos que bat_speed, no más, y solo
+se ve controlando por el trade-off, no en la correlación simple.
 
 Corre `python3 model/train_full_4feature_model.py` para reproducir todo,
 incluyendo `data/real_sample/merged_4feature_dataset_2026.csv`, el dataset
