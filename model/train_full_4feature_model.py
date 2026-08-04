@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold, cross_val_predict
 from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.preprocessing import StandardScaler
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_DIR = ROOT / "data" / "real_sample"
@@ -69,14 +70,27 @@ def train_and_eval(df, features, target, n_splits=10):
     X = df[features].values
     y = df[target].values
 
+    # IMPORTANT: LinearRegression().fit() does NOT standardize features.
+    # Raw coefficients are in native units (mph for bat_speed, a 0-1
+    # proportion for squared_up_per_swing, feet for swing_length, degrees
+    # for attack_angle) and are NOT comparable to each other as "importance."
+    # We fit on standardized (z-scored) X so coefficients are true
+    # standardized betas -- comparable across features regardless of
+    # their original units/scale.
+    scaler = StandardScaler()
+    X_std = scaler.fit_transform(X)
+
     model = LinearRegression()
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-    y_pred = cross_val_predict(model, X, y, cv=kf)
+    y_pred = cross_val_predict(model, X_std, y, cv=kf)
 
     mae = mean_absolute_error(y, y_pred)
     r2 = r2_score(y, y_pred)
 
-    model.fit(X, y)
+    model.fit(X_std, y)
+    # These are now true standardized coefficients (betas): the expected
+    # change in y, in standard deviations, per 1-SD change in that
+    # feature, holding the others constant.
     coefs = dict(zip(features, model.coef_.round(5).tolist()))
 
     return {
@@ -86,7 +100,7 @@ def train_and_eval(df, features, target, n_splits=10):
         "cv_folds": n_splits,
         "cv_r2": round(r2, 4),
         "cv_mae": round(mae, 5),
-        "coefficients": coefs,
+        "standardized_coefficients": coefs,
         "intercept": round(float(model.intercept_), 5),
     }
 
@@ -122,6 +136,57 @@ def make_chart(results):
     return out
 
 
+def make_coef_chart(results):
+    """Standardized-coefficient chart, corrected: features were z-scored
+    before fitting, so these bars are genuinely comparable across features
+    regardless of native units (mph, proportion, feet, degrees)."""
+    labels = ["xwOBA oficial\n(est_woba)", "Barrel%\noficial"]
+    feats_pretty = {
+        "avg_bat_speed": "Bat Speed",
+        "squared_up_per_swing": "Squared-Up%",
+        "swing_length": "Swing Length",
+        "attack_angle": "Attack Angle",
+    }
+    colors = {"avg_bat_speed": NAVY, "squared_up_per_swing": GOLD,
+              "swing_length": "#8C8C8C", "attack_angle": "#B7CADB"}
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 6), dpi=200, sharey=False)
+    fig.patch.set_facecolor(OFFWHITE)
+
+    for ax, res, label in zip(axes, results, labels):
+        ax.set_facecolor(OFFWHITE)
+        feats = list(res["standardized_coefficients"].keys())
+        vals = [res["standardized_coefficients"][f] for f in feats]
+        # sort by absolute magnitude, descending
+        order = sorted(range(len(feats)), key=lambda i: -abs(vals[i]))
+        feats = [feats[i] for i in order]
+        vals = [vals[i] for i in order]
+
+        bars = ax.barh([feats_pretty[f] for f in feats], vals,
+                        color=[colors[f] for f in feats], zorder=3)
+        for b, v in zip(bars, vals):
+            ax.annotate(f"{v:+.3f}", xy=(v, b.get_y() + b.get_height() / 2),
+                        xytext=(6 if v >= 0 else -6, 0), textcoords="offset points",
+                        ha="left" if v >= 0 else "right", va="center",
+                        fontsize=10, fontweight="bold", color=NAVY)
+        ax.axvline(0, color=NAVY, linewidth=0.8)
+        ax.set_title(label, fontsize=12, fontweight="bold", color=NAVY)
+        ax.grid(axis="x", linestyle="--", alpha=0.3, zorder=0)
+        for spine in ["top", "right"]:
+            ax.spines[spine].set_visible(False)
+        for spine in ["left", "bottom"]:
+            ax.spines[spine].set_color(NAVY)
+
+    fig.suptitle("EP Swing Intelligence — Capítulo 5 (corregido)\n"
+                  "Coeficientes ESTANDARIZADOS (features z-scoreadas antes de ajustar)",
+                  fontsize=12.5, fontweight="bold", color=NAVY, y=1.03)
+    plt.tight_layout()
+    out = REPORT_DIR / "chart_capitulo5_coeficientes.png"
+    plt.savefig(out, facecolor=OFFWHITE, bbox_inches="tight")
+    plt.close()
+    return out
+
+
 def main():
     df = load_and_merge()
     print(f"Jugadores con las 4 variables + ambos targets oficiales: {len(df)}\n")
@@ -134,7 +199,7 @@ def main():
         print(f"  n:                {res['n']}")
         print(f"  CV R² (10-fold):  {res['cv_r2']}")
         print(f"  CV MAE:           {res['cv_mae']}")
-        print(f"  Coeficientes:     {res['coefficients']}")
+        print(f"  Coeficientes estandarizados: {res['standardized_coefficients']}")
         print()
 
     print("=== Comparación con todos los capítulos anteriores ===")
@@ -152,6 +217,9 @@ def main():
 
     chart_path = make_chart(results)
     print(f"Wrote {chart_path}")
+
+    coef_chart_path = make_coef_chart(results)
+    print(f"Wrote {coef_chart_path}")
 
     # Also export the merged dataset for transparency/reuse
     merged_path = SAMPLE_DIR / "merged_4feature_dataset_2026.csv"
