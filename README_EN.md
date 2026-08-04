@@ -81,11 +81,31 @@ variables is a credible, defensible result in front of a technical
 audience — the simulated result (0.81) remains a reference point, not a
 fair comparison.
 
-**Finding within chapter 5:** `squared_up_per_swing` outweighs
-`avg_bat_speed` on both targets (standardized coefficients) — contact
-quality explains more variance than raw swing force, contrary to the
-intuition that "hitting it harder = better outcome." See
-`report/chart_capitulo5_coeficientes.png`.
+**Correction (post-chapter 5):** the original version of this finding
+claimed `squared_up_per_swing` outweighed `avg_bat_speed` on both targets.
+That was a scaling bug, not a real finding: `train_and_eval()` fit
+`LinearRegression` on the features in their native units (mph for
+bat_speed, a 0-1 proportion for squared_up_per_swing) without standardizing
+first, so the raw coefficients were not comparable — squared_up_per_swing's
+coefficient came out numerically larger only because its scale is ~65x
+smaller than bat_speed's, not because it mattered more.
+
+With features standardized (z-scored) before fitting -- which is what
+"standardized coefficients" should mean -- the result flips: **`avg_bat_speed`
+has the larger coefficient on both targets** (xwOBA: 0.032 vs. 0.021;
+Barrel%: 3.45 vs. 0.49). The model's R² did not change (0.42 / 0.63 -- the
+predictions were always correct, only the coefficient interpretation was
+wrong).
+
+What does still hold, and replicates in an external sample of 177 MLB
+hitters: `avg_bat_speed` and `squared_up_per_swing` are negatively
+correlated with each other (r≈-0.65, the power/contact trade-off), which
+produces a suppression effect -- squared_up_per_swing's raw correlation
+with xwOBA is close to zero (r=0.07, n.s.), but its standardized
+coefficient, once you control for bat_speed, is substantial (about 40% of
+the two features' combined effect). In short: squared_up_per_swing does
+matter -- just less than bat_speed, not more, and only visible once you
+control for the trade-off rather than in the simple correlation.
 
 Run `python3 model/train_full_4feature_model.py` to reproduce everything,
 including `data/real_sample/merged_4feature_dataset_2026.csv`, the combined
